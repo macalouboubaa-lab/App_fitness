@@ -1,0 +1,7 @@
+# Cursor Rules
+
+- Respecter la structure Next.js App Router.
+- Garder les composants simples et réutilisables.
+- Éviter les dépendances superflues.
+- Préserver la lisibilité du code et la cohérence visuelle.
+- Travailler en gardant le plan de suivi fitness au centre de l'UX.

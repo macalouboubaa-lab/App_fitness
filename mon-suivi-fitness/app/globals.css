@@ -1,0 +1,117 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* MODE JOUR */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 4%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 4%;
+    --primary: 281 100% 63%;           /* Mauve #C342FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 280 20% 96%;
+    --secondary-foreground: 281 100% 30%;
+    --muted: 280 20% 96%;
+    --muted-foreground: 240 5% 45%;
+    --accent: 281 100% 96%;
+    --accent-foreground: 281 100% 30%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 280 20% 90%;
+    --input: 280 20% 90%;
+    --ring: 281 100% 63%;
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    /* MODE NUIT */
+    --background: 223 39% 7%;           /* #0B0F19 */
+    --foreground: 0 0% 98%;
+    --card: 223 35% 10%;
+    --card-foreground: 0 0% 98%;
+    --primary: 281 100% 63%;            /* Mauve #C342FF */
+    --primary-foreground: 0 0% 100%;
+    --secondary: 223 30% 15%;
+    --secondary-foreground: 0 0% 98%;
+    --muted: 223 30% 15%;
+    --muted-foreground: 220 10% 65%;
+    --accent: 281 60% 20%;
+    --accent-foreground: 281 100% 90%;
+    --destructive: 0 62% 40%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 223 25% 20%;
+    --input: 223 25% 20%;
+    --ring: 281 100% 63%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    transition: background-color 0.3s ease, color 0.3s ease;
+  }
+}
+
+/* ═══════════════════════════════════════════ */
+/* EFFETS VISUELS — Glow, Text Stroke, etc.    */
+/* ═══════════════════════════════════════════ */
+
+@layer utilities {
+  /* Effet de lueur mauve autour d'un élément */
+  .glow-mauve {
+    box-shadow: 0 0 20px rgba(195, 66, 255, 0.35),
+                0 0 40px rgba(195, 66, 255, 0.15);
+  }
+
+  .glow-mauve-sm {
+    box-shadow: 0 0 10px rgba(195, 66, 255, 0.4);
+  }
+
+  .glow-mauve-lg {
+    box-shadow: 0 0 30px rgba(195, 66, 255, 0.5),
+                0 0 60px rgba(195, 66, 255, 0.25);
+  }
+
+  /* Lueur sur le texte */
+  .text-glow {
+    text-shadow: 0 0 10px rgba(195, 66, 255, 0.6),
+                 0 0 20px rgba(195, 66, 255, 0.3);
+  }
+
+  /* Contour de texte (text stroke) */
+  .text-stroke {
+    -webkit-text-stroke: 2px hsl(var(--primary));
+    -webkit-text-fill-color: transparent;
+  }
+
+  .text-stroke-thin {
+    -webkit-text-stroke: 1px hsl(var(--primary));
+    -webkit-text-fill-color: transparent;
+  }
+
+  /* Dégradé mauve */
+  .bg-gradient-mauve {
+    background: linear-gradient(135deg, #C342FF 0%, #7B2FFF 100%);
+  }
+
+  /* Animation de pulsation pour le glow */
+  .animate-glow-pulse {
+    animation: glow-pulse 2.5s ease-in-out infinite;
+  }
+}
+
+@keyframes glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 20px rgba(195, 66, 255, 0.35),
+                0 0 40px rgba(195, 66, 255, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(195, 66, 255, 0.55),
+                0 0 60px rgba(195, 66, 255, 0.3);
+  }
+}
