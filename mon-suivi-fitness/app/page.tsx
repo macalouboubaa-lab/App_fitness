@@ -8,6 +8,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
 import { AuthGate } from "@/components/AuthGate";
 import { useUser } from "@/components/UserProvider";
+import { fetchUserProgress } from "@/lib/supabase";
 import {
   Card,
   CardHeader,
@@ -20,12 +21,14 @@ import { motion } from "framer-motion";
 import { Flame, Trophy, Calendar, ChevronRight, Zap } from "lucide-react";
 
 function DashboardContent() {
-  const { user, getStorageKey } = useUser();
+  const { user, getStorageKey, getUserSlug } = useUser();
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   useEffect(() => {
     if (!user) return;
     const key = getStorageKey("rope_jump_completed");
+
+    // 1. Charger depuis localStorage (immédiat)
     const saved = localStorage.getItem(key);
     if (saved) {
       try {
@@ -36,7 +39,23 @@ function DashboardContent() {
     } else {
       setCompletedExercises([]);
     }
-  }, [user, getStorageKey]);
+
+    // 2. Charger depuis Supabase (async) et fusionner
+    const loadFromSupabase = async () => {
+      const { data } = await fetchUserProgress(getUserSlug());
+      if (data && data.length > 0) {
+        const supabaseIds = data.map(
+          (p: { exercise_id: string }) => p.exercise_id
+        );
+        const localIds = saved ? JSON.parse(saved) : [];
+        const merged = Array.from(new Set([...localIds, ...supabaseIds]));
+        setCompletedExercises(merged);
+        localStorage.setItem(key, JSON.stringify(merged));
+      }
+    };
+
+    loadFromSupabase();
+  }, [user, getStorageKey, getUserSlug]);
 
   const totalAllExercises = PROGRAM_WEEKS.flatMap((w) =>
     w.sessions.flatMap((s) => s.exercises)
@@ -48,7 +67,6 @@ function DashboardContent() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      {/* Header */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/70 border-b border-border">
         <div className="container max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/" className="flex items-center gap-2">
@@ -178,7 +196,6 @@ function DashboardContent() {
         </div>
       </main>
 
-      {/* Signature */}
       <footer className="container max-w-5xl mx-auto px-4 pb-10 pt-6 mt-10 border-t border-border/50">
         <div className="text-center space-y-1">
           <p className="text-sm font-bold text-foreground">Boubacar Cissé</p>

@@ -15,11 +15,19 @@ import {
   Eye,
 } from "lucide-react";
 import { PROGRAM_WEEKS } from "@/lib/exercises";
+import {
+  fetchAllUsers,
+  fetchAllProgress,
+  deleteUser as deleteSupabaseUser,
+  isSupabaseConfigured,
+  SupabaseUser,
+  SupabaseProgress,
+} from "@/lib/supabase";
 
 // ═══════════════════════════════════════════════
 // 🔑 MOT DE PASSE ADMIN — À CHANGER
 // ═══════════════════════════════════════════════
-const ADMIN_PASSWORD = "RDSG2026";
+const ADMIN_PASSWORD = "RDSG-admin-2026";
 
 interface UserStats {
   name: string;
@@ -36,6 +44,7 @@ export default function AdminPage() {
   const [error, setError] = useState("");
   const [users, setUsers] = useState<UserStats[]>([]);
   const [selectedUser, setSelectedUser] = useState<UserStats | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     const auth = sessionStorage.getItem("rdsg_admin_auth");
@@ -46,56 +55,93 @@ export default function AdminPage() {
     if (isAuthenticated) loadUsers();
   }, [isAuthenticated]);
 
-  const loadUsers = () => {
+  const loadUsers = async () => {
+    setIsLoading(true);
+
     const totalExercises = PROGRAM_WEEKS.flatMap((w) =>
       w.sessions.flatMap((s) => s.exercises)
     ).length;
 
-    const allKeys = Object.keys(localStorage);
-    const userKeys = allKeys.filter((k) =>
-      k.startsWith("rope_jump_completed_")
-    );
+    let usersList: UserStats[] = [];
 
-    const usersList: UserStats[] = [];
+    if (isSupabaseConfigured()) {
+      // ═══ MODE SUPABASE ═══
+      const { data: supaUsers } = await fetchAllUsers();
+      const { data: supaProgress } = await fetchAllProgress();
 
-    userKeys.forEach((key) => {
-      const slug = key.replace("rope_jump_completed_", "");
-      try {
-        const data = JSON.parse(localStorage.getItem(key) || "[]");
-        const completedCount = Array.isArray(data) ? data.length : 0;
+      if (supaUsers && supaUsers.length > 0) {
+        usersList = supaUsers.map((u: SupabaseUser) => {
+          const userProgress = (supaProgress || []).filter(
+            (p: SupabaseProgress) => p.user_slug === u.slug
+          );
+          const completedCount = userProgress.length;
 
-        // Calculer les semaines complétées
-        let weeksCompleted = 0;
-        PROGRAM_WEEKS.forEach((w) => {
-          const weekExos = w.sessions.flatMap((s) => s.exercises);
-          const completed = weekExos.filter((e) =>
-            data.includes(e.id)
-          ).length;
-          if (weekExos.length > 0 && completed === weekExos.length) {
-            weeksCompleted++;
-          }
+          let weeksCompleted = 0;
+          PROGRAM_WEEKS.forEach((w) => {
+            const weekExos = w.sessions.flatMap((s) => s.exercises);
+            const completed = weekExos.filter((e) =>
+              userProgress.some((p) => p.exercise_id === e.id)
+            ).length;
+            if (weekExos.length > 0 && completed === weekExos.length) {
+              weeksCompleted++;
+            }
+          });
+
+          return {
+            name: u.display_name,
+            slug: u.slug,
+            completedCount,
+            totalExercises,
+            percent:
+              totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0,
+            weeksCompleted,
+          };
         });
-
-        usersList.push({
-          name: slug
-            .replace(/_/g, " ")
-            .replace(/\b\w/g, (l) => l.toUpperCase()),
-          slug,
-          completedCount,
-          totalExercises,
-          percent:
-            totalExercises > 0
-              ? (completedCount / totalExercises) * 100
-              : 0,
-          weeksCompleted,
-        });
-      } catch (e) {
-        console.error("Error parsing", key, e);
       }
-    });
+    } else {
+      // ═══ MODE LOCAL (fallback) ═══
+      const allKeys = Object.keys(localStorage);
+      const userKeys = allKeys.filter((k) =>
+        k.startsWith("rope_jump_completed_")
+      );
+
+      userKeys.forEach((key: string) => {
+        const slug = key.replace("rope_jump_completed_", "");
+        try {
+          const data = JSON.parse(localStorage.getItem(key) || "[]");
+          const completedCount = Array.isArray(data) ? data.length : 0;
+
+          let weeksCompleted = 0;
+          PROGRAM_WEEKS.forEach((w) => {
+            const weekExos = w.sessions.flatMap((s) => s.exercises);
+            const completed = weekExos.filter((e) =>
+              data.includes(e.id)
+            ).length;
+            if (weekExos.length > 0 && completed === weekExos.length) {
+              weeksCompleted++;
+            }
+          });
+
+          usersList.push({
+            name: slug
+              .replace(/_/g, " ")
+              .replace(/\b\w/g, (l: string) => l.toUpperCase()),
+            slug,
+            completedCount,
+            totalExercises,
+            percent:
+              totalExercises > 0 ? (completedCount / totalExercises) * 100 : 0,
+            weeksCompleted,
+          });
+        } catch (e) {
+          console.error("Error parsing", key, e);
+        }
+      });
+    }
 
     usersList.sort((a, b) => b.completedCount - a.completedCount);
     setUsers(usersList);
+    setIsLoading(false);
   };
 
   const handleLogin = (e: React.FormEvent) => {
@@ -118,12 +164,15 @@ export default function AdminPage() {
     setSelectedUser(null);
   };
 
-  const handleDeleteUser = (slug: string) => {
+  const handleDeleteUser = async (slug: string) => {
     if (
       confirm(
         `Supprimer définitivement les données de "${slug}" ? Cette action est irréversible.`
       )
     ) {
+      if (isSupabaseConfigured()) {
+        await deleteSupabaseUser(slug);
+      }
       localStorage.removeItem(`rope_jump_completed_${slug}`);
       loadUsers();
       if (selectedUser?.slug === slug) setSelectedUser(null);
@@ -206,15 +255,23 @@ export default function AdminPage() {
               <Lock className="w-4 h-4 text-white" />
             </div>
             <span className="font-black text-base">Admin Dashboard</span>
+            {isSupabaseConfigured() && (
+              <Badge variant="outline" className="text-xs hidden sm:flex">
+                ☁️ Supabase
+              </Badge>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
               onClick={loadUsers}
+              disabled={isLoading}
               className="gap-2"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw
+                className={`w-4 h-4 ${isLoading ? "animate-spin" : ""}`}
+              />
               <span className="hidden sm:inline">Actualiser</span>
             </Button>
             <Button variant="outline" size="sm" onClick={handleLogout}>
@@ -282,10 +339,9 @@ export default function AdminPage() {
             {users.length === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <Users className="w-16 h-16 mx-auto mb-4 opacity-30" />
-                <p className="font-semibold">Aucun utilisateur sur cet appareil</p>
+                <p className="font-semibold">Aucun utilisateur</p>
                 <p className="text-xs mt-2 max-w-sm mx-auto">
-                  Les utilisateurs apparaîtront ici après s'être connectés
-                  depuis <strong>ce navigateur</strong>.
+                  Les utilisateurs apparaîtront ici après s'être connectés.
                 </p>
               </div>
             ) : (
@@ -403,7 +459,6 @@ export default function AdminPage() {
                 </div>
               </div>
 
-              {/* Progression par semaine */}
               <div className="space-y-2">
                 <h3 className="text-sm font-bold">Progression par semaine</h3>
                 <div className="space-y-2">
@@ -448,17 +503,38 @@ export default function AdminPage() {
           </Card>
         )}
 
-        {/* Info limitation */}
-        <Card className="border-amber-500/30 bg-amber-500/5">
-          <CardContent className="p-4 text-sm text-amber-600 dark:text-amber-400 space-y-2">
-            <p>
-              ⚠️ <strong>Limitation :</strong> Cette vue ne montre que les
-              utilisateurs connectés sur <strong>ce navigateur</strong>.
-            </p>
-            <p className="text-xs">
-              💡 Pour voir les utilisateurs sur tous les appareils, il faudra
-              ajouter Supabase (base de données cloud gratuite).
-            </p>
+        {/* Info mode */}
+        <Card
+          className={
+            isSupabaseConfigured()
+              ? "border-emerald-500/30 bg-emerald-500/5"
+              : "border-amber-500/30 bg-amber-500/5"
+          }
+        >
+          <CardContent className="p-4 text-sm space-y-2">
+            {isSupabaseConfigured() ? (
+              <>
+                <p className="text-emerald-600 dark:text-emerald-400">
+                  ☁️ <strong>Mode Supabase activé</strong> — Les utilisateurs
+                  sont synchronisés sur tous les appareils.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  💡 Les utilisateurs apparaissent ici dès qu'ils se connectent
+                  sur n'importe quel appareil.
+                </p>
+              </>
+            ) : (
+              <>
+                <p className="text-amber-600 dark:text-amber-400">
+                  ⚠️ <strong>Mode local</strong> — Cette vue ne montre que les
+                  utilisateurs sur ce navigateur.
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  💡 Ajoute les variables Supabase sur Vercel pour activer la
+                  synchronisation.
+                </p>
+              </>
+            )}
           </CardContent>
         </Card>
 

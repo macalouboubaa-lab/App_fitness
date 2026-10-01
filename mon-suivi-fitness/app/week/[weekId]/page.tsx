@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { PROGRAM_WEEKS, Week } from "@/lib/exercises";
 import { ExerciseCard } from "@/components/ExerciseCard";
+import { saveExerciseCompletion } from "@/lib/supabase";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { UserMenu } from "@/components/UserMenu";
@@ -20,14 +21,13 @@ import {
   Trophy,
   Flame,
   CheckCircle,
-  Zap,
 } from "lucide-react";
 
 function WeekContent() {
   const params = useParams();
   const router = useRouter();
   const weekId = Number(params.weekId);
-  const { user, getStorageKey } = useUser();
+  const { user, getStorageKey, getUserSlug } = useUser();
 
   const week: Week | undefined = PROGRAM_WEEKS.find((w) => w.id === weekId);
 
@@ -48,14 +48,20 @@ function WeekContent() {
     }
   }, [user, getStorageKey]);
 
-  const toggleExercise = (exerciseId: string) => {
+  const toggleExercise = async (exerciseId: string) => {
     const key = getStorageKey("rope_jump_completed");
-    const updated = completedExercises.includes(exerciseId)
-      ? completedExercises.filter((id) => id !== exerciseId)
-      : [...completedExercises, exerciseId];
+    const isCurrentlyCompleted = completedExercises.includes(exerciseId);
+    const newCompleted = !isCurrentlyCompleted;
+
+    const updated = newCompleted
+      ? [...completedExercises, exerciseId]
+      : completedExercises.filter((id) => id !== exerciseId);
 
     setCompletedExercises(updated);
     localStorage.setItem(key, JSON.stringify(updated));
+
+    // Synchroniser avec Supabase (async, ne bloque pas l'UI)
+    saveExerciseCompletion(getUserSlug(), exerciseId, newCompleted);
   };
 
   if (!week) {
