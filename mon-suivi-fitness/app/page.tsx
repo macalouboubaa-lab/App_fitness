@@ -4,6 +4,10 @@ import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { PROGRAM_WEEKS } from "@/lib/exercises";
 import { ProgressBar } from "@/components/ProgressBar";
+import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
+import { AuthGate } from "@/components/AuthGate";
+import { useUser } from "@/components/UserProvider";
 import {
   Card,
   CardHeader,
@@ -15,19 +19,24 @@ import { Badge } from "@/components/ui/badge";
 import { motion } from "framer-motion";
 import { Flame, Trophy, Calendar, ChevronRight, Zap } from "lucide-react";
 
-export default function DashboardPage() {
+function DashboardContent() {
+  const { user, getStorageKey } = useUser();
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   useEffect(() => {
-    const saved = localStorage.getItem("rope_jump_completed");
+    if (!user) return;
+    const key = getStorageKey("rope_jump_completed");
+    const saved = localStorage.getItem(key);
     if (saved) {
       try {
         setCompletedExercises(JSON.parse(saved));
       } catch (e) {
         console.error(e);
       }
+    } else {
+      setCompletedExercises([]);
     }
-  }, []);
+  }, [user, getStorageKey]);
 
   const totalAllExercises = PROGRAM_WEEKS.flatMap((w) =>
     w.sessions.flatMap((s) => s.exercises)
@@ -39,6 +48,29 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
+      {/* Header */}
+      <header className="sticky top-0 z-50 backdrop-blur-md bg-background/70 border-b border-border">
+        <div className="container max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+          <Link href="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-mauve glow-mauve-sm flex items-center justify-center">
+              <Zap className="w-4 h-4 text-white" />
+            </div>
+            <span className="font-black text-base">
+              JUMP<span className="text-primary">ROPE</span>
+            </span>
+          </Link>
+          <div className="flex items-center gap-2">
+            <Link href="/landing">
+              <button className="hidden sm:block text-sm font-medium hover:text-primary transition-colors px-3 py-2">
+                À propos
+              </button>
+            </Link>
+            <UserMenu />
+            <ThemeToggle />
+          </div>
+        </div>
+      </header>
+
       <section className="bg-gradient-to-b from-primary/10 via-background to-background pt-10 pb-8 border-b">
         <div className="container max-w-5xl mx-auto px-4 space-y-6">
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
@@ -47,10 +79,11 @@ export default function DashboardPage() {
                 <Zap className="w-3.5 h-3.5" /> Programme 8 Semaines
               </div>
               <h1 className="text-3xl sm:text-4xl font-extrabold tracking-tight">
-                Jump Rope Master 🚀
+                Bonjour {user?.name} 👋
               </h1>
               <p className="text-muted-foreground text-sm sm:text-base mt-1">
-                Suis ton évolution, gagne en endurance et sculpte ton corps jour après jour.
+                Suis ton évolution, gagne en endurance et sculpte ton corps jour
+                après jour.
               </p>
             </div>
 
@@ -90,7 +123,8 @@ export default function DashboardPage() {
             ).length;
             const weekPercent =
               totalInWeek > 0 ? (completedInWeek / totalInWeek) * 100 : 0;
-            const isCompleted = totalInWeek > 0 && completedInWeek === totalInWeek;
+            const isCompleted =
+              totalInWeek > 0 && completedInWeek === totalInWeek;
 
             return (
               <motion.div
@@ -102,12 +136,15 @@ export default function DashboardPage() {
                 <Link href={`/week/${week.id}`}>
                   <Card
                     className={`h-full transition-all duration-300 hover:shadow-lg hover:border-primary/50 relative overflow-hidden group cursor-pointer ${
-                      isCompleted ? "bg-emerald-500/5 border-emerald-500/30" : ""
+                      isCompleted ? "bg-primary/5 border-primary/30" : ""
                     }`}
                   >
                     <CardHeader className="pb-3">
                       <div className="flex justify-between items-start gap-2">
-                        <Badge variant="outline" className="text-xs font-semibold">
+                        <Badge
+                          variant="outline"
+                          className="text-xs font-semibold"
+                        >
                           {week.badgeText}
                         </Badge>
                         <span className="text-xs font-bold text-primary flex items-center gap-1">
@@ -139,19 +176,25 @@ export default function DashboardPage() {
             );
           })}
         </div>
-          </main>
+      </main>
 
       {/* Signature */}
       <footer className="container max-w-5xl mx-auto px-4 pb-10 pt-6 mt-10 border-t border-border/50">
         <div className="text-center space-y-1">
-          <p className="text-sm font-bold text-foreground">
-            Boubacar Cissé
-          </p>
+          <p className="text-sm font-bold text-foreground">Boubacar Cissé</p>
           <p className="text-xs text-primary font-semibold">
             Dev Fullstack — #77 315 04 50
           </p>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function DashboardPage() {
+  return (
+    <AuthGate>
+      <DashboardContent />
+    </AuthGate>
   );
 }

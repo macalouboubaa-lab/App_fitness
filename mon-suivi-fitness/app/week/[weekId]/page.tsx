@@ -7,6 +7,9 @@ import { PROGRAM_WEEKS, Week } from "@/lib/exercises";
 import { ExerciseCard } from "@/components/ExerciseCard";
 import { ProgressBar } from "@/components/ProgressBar";
 import { ThemeToggle } from "@/components/ThemeToggle";
+import { UserMenu } from "@/components/UserMenu";
+import { AuthGate } from "@/components/AuthGate";
+import { useUser } from "@/components/UserProvider";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -20,33 +23,39 @@ import {
   Zap,
 } from "lucide-react";
 
-export default function WeekDetailPage() {
+function WeekContent() {
   const params = useParams();
   const router = useRouter();
   const weekId = Number(params.weekId);
+  const { user, getStorageKey } = useUser();
 
   const week: Week | undefined = PROGRAM_WEEKS.find((w) => w.id === weekId);
 
   const [completedExercises, setCompletedExercises] = useState<string[]>([]);
 
   useEffect(() => {
-    const savedProgress = localStorage.getItem("rope_jump_completed");
-    if (savedProgress) {
+    if (!user) return;
+    const key = getStorageKey("rope_jump_completed");
+    const saved = localStorage.getItem(key);
+    if (saved) {
       try {
-        setCompletedExercises(JSON.parse(savedProgress));
+        setCompletedExercises(JSON.parse(saved));
       } catch (e) {
-        console.error("Erreur de lecture du localStorage", e);
+        console.error(e);
       }
+    } else {
+      setCompletedExercises([]);
     }
-  }, []);
+  }, [user, getStorageKey]);
 
   const toggleExercise = (exerciseId: string) => {
+    const key = getStorageKey("rope_jump_completed");
     const updated = completedExercises.includes(exerciseId)
       ? completedExercises.filter((id) => id !== exerciseId)
       : [...completedExercises, exerciseId];
 
     setCompletedExercises(updated);
-    localStorage.setItem("rope_jump_completed", JSON.stringify(updated));
+    localStorage.setItem(key, JSON.stringify(updated));
   };
 
   if (!week) {
@@ -70,26 +79,25 @@ export default function WeekDetailPage() {
 
   return (
     <div className="min-h-screen bg-background pb-16">
-      {/* Header sticky avec ThemeToggle */}
       <header className="sticky top-0 z-50 backdrop-blur-md bg-background/70 border-b border-border">
         <div className="container max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
           <Link href="/">
             <Button variant="ghost" size="sm" className="gap-2">
               <ArrowLeft className="w-4 h-4" />
-              <span>Accueil</span>
+              <span className="hidden sm:inline">Accueil</span>
             </Button>
           </Link>
           <div className="flex items-center gap-2">
-            <Badge variant="secondary" className="font-semibold">
+            <Badge variant="secondary" className="font-semibold hidden sm:flex">
               Semaine {week.id} sur 8
             </Badge>
+            <UserMenu />
             <ThemeToggle />
           </div>
         </div>
       </header>
 
       <main className="container max-w-4xl mx-auto px-4 pt-6 space-y-8">
-        {/* Banner de la Semaine */}
         <motion.div
           initial={{ opacity: 0, y: 15 }}
           animate={{ opacity: 1, y: 0 }}
@@ -125,7 +133,6 @@ export default function WeekDetailPage() {
           <ProgressBar value={weekProgressPercent} className="pt-2" />
         </motion.div>
 
-        {/* Liste des Séances */}
         {week.sessions.length === 0 ? (
           <Card className="p-8 text-center text-muted-foreground">
             <Trophy className="w-12 h-12 mx-auto mb-3 text-muted-foreground/50" />
@@ -159,7 +166,7 @@ export default function WeekDetailPage() {
                     </div>
                     {isSessionDone && (
                       <Badge className="bg-primary/15 text-primary border-primary/30">
-                        Séance Terminée 🎉
+                        Terminée 🎉
                       </Badge>
                     )}
                   </div>
@@ -179,19 +186,24 @@ export default function WeekDetailPage() {
             })}
           </div>
         )}
-            </main>
+      </main>
 
-      {/* Signature */}
       <footer className="container max-w-4xl mx-auto px-4 pb-10 pt-6 mt-10 border-t border-border/50">
         <div className="text-center space-y-1">
-          <p className="text-sm font-bold text-foreground">
-            Boubacar Cissé
-          </p>
+          <p className="text-sm font-bold text-foreground">Boubacar Cissé</p>
           <p className="text-xs text-primary font-semibold">
             Dev Fullstack — #77 315 04 50
           </p>
         </div>
       </footer>
     </div>
+  );
+}
+
+export default function WeekDetailPage() {
+  return (
+    <AuthGate>
+      <WeekContent />
+    </AuthGate>
   );
 }
